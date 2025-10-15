@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <title>Egyszerű WebRTC chat</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    textarea { width: 100%; height: 100px; }
+    button { margin: 5px 0; }
+  </style>
+</head>
+<body>
+  <h1>WebRTC kapcsolat teszt</h1>
+
+  <button id="createOffer">Offer létrehozása</button>
+  <button id="createAnswer">Answer létrehozása</button>
+  <button id="sendMessage">Üzenet küldése</button>
+
+  <h3>Local description (másold ki a másik oldalra):</h3>
+  <textarea id="local"></textarea>
+
+  <h3>Remote description (másikról beillesztve):</h3>
+  <textarea id="remote"></textarea>
+  <button id="setRemote">Beállítás</button>
+
+  <h3>Üzenet napló:</h3>
+  <div id="log"></div>
+
+  <script>
+    let pc;
+    let channel;
+
+    function log(msg) {
+      document.getElementById("log").innerHTML += msg + "<br>";
+    }
+
+    // ---- OFFER létrehozása ----
+    document.getElementById("createOffer").onclick = async () => {
+      pc = new RTCPeerConnection();
+
+      // adatcsatorna létrehozása
+      channel = pc.createDataChannel("chat");
+      channel.onmessage = e => log("Másik: " + e.data);
+
+      pc.onicecandidate = e => {
+        if (e.candidate === null) {
+          document.getElementById("local").value = JSON.stringify(pc.localDescription);
+        }
+      };
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+    };
+
+    // ---- ANSWER létrehozása ----
+    document.getElementById("createAnswer").onclick = async () => {
+      pc = new RTCPeerConnection();
+
+      pc.ondatachannel = e => {
+        channel = e.channel;
+        channel.onmessage = ev => log("Másik: " + ev.data);
+      };
+
+      pc.onicecandidate = e => {
+        if (e.candidate === null) {
+          document.getElementById("local").value = JSON.stringify(pc.localDescription);
+        }
+      };
+
+      const remoteDesc = JSON.parse(document.getElementById("remote").value);
+      await pc.setRemoteDescription(remoteDesc);
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+    };
+
+    // ---- Remote beállítása ----
+    document.getElementById("setRemote").onclick = async () => {
+      const remoteDesc = JSON.parse(document.getElementById("remote").value);
+      await pc.setRemoteDescription(remoteDesc);
+      log("Remote description beállítva.");
+    };
+
+    // ---- Üzenet küldése ----
+    document.getElementById("sendMessage").onclick = () => {
+      const text = prompt("Írj egy üzenetet:");
+      channel.send(text);
+      log("Te: " + text);
+    };
+  </script>
+</body>
+</html>
